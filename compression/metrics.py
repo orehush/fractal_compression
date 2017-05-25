@@ -1,33 +1,20 @@
 import numpy as np
 
 
-def measure(range_block, domain_block, color_shift):
+def scale_matrix_by_size(matrix: np.ndarray, transform_matrix: np.ndarray):
     """
 
-    :param range_block: np.array
-    :param domain_block: np.array
-    :param color_shift: float
-    :return: float
-    """
-    return (
-        (range_block - (domain_block + color_shift))**2
-    ).sum()
-
-
-def scale_matrix_by_size(matrix, transform_matrix):
-    """
-
-    :param matrix: np.array
-    :param transform_matrix: np.array
-    :return: np.array
+    :param matrix: np.ndarray
+    :param transform_matrix: np.ndarray
+    :return: np.ndarray
     """
     return matrix.dot(transform_matrix).T.dot(transform_matrix).T
 
 
-def merge_with_ones_vector(a):
+def merge_with_ones_vector(a: np.ndarray) -> np.ndarray:
     """
-    :param a - np.array
-    :return np.array
+    :param a - np.ndarray
+    :return np.ndarray
     """
     ones_vector = np.ones(a.shape, dtype=np.int16)
     return np.concatenate((ones_vector, a), axis=1)
@@ -35,16 +22,16 @@ def merge_with_ones_vector(a):
 
 def reshape_to_vector(a):
     """
-    :param a - np.array
-    :return np.array
+    :param a - np.ndarray
+    :return np.ndarray
     """
     return np.array(a.reshape((a.shape[0]**2, 1)), dtype=np.int16)
 
 
 def distance_L2(a, b):
     """
-    :param a - np.array
-    :param b - np.array
+    :param a - np.ndarray
+    :param b - np.ndarray
     :return float
     """
     return ((a-b)**2).sum()
@@ -52,9 +39,9 @@ def distance_L2(a, b):
 
 def ols(a, b):
     """
-    :param a - np.array - square block
-    :param b - np.array - square block
-    :return np.array, float - coeficients of ols, error
+    :param a - np.ndarray - square block
+    :param b - np.ndarray - square block
+    :return np.ndarray, float - coeficients of ols, error
     """
     a = reshape_to_vector(a)
     b = reshape_to_vector(b)
@@ -63,23 +50,23 @@ def ols(a, b):
     return beta, distance_L2(A.dot(beta), b)
 
 
-def calculate_mse(first_array, second_array):
+def calculate_mse(first_array: np.ndarray, second_array: np.ndarray) -> float:
     """
 
-    :param first_array: np.array
-    :param second_array: np.array
-    :return:
+    :param first_array: np.ndarray
+    :param second_array: np.ndarray
+    :return: float
     """
-    return ((first_array - second_array)**2).sum()/\
-           (first_array.shape[0]*first_array.shape[1])
+    width, height = first_array.shape[:2]
+    return ((first_array - second_array)**2).sum() / (width * height)
 
 
-def calculate_psnr(first_array, second_array):
+def calculate_psnr(first_array: np.ndarray, second_array: np.ndarray) -> float:
     """
 
-    :param first_array: np.array
-    :param second_array: np.array
-    :return:
+    :param first_array: np.ndarray
+    :param second_array: np.ndarray
+    :return: float
     """
 
     return 10*np.log10((255**2)/calculate_mse(first_array, second_array))

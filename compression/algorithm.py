@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 
 from PIL import Image
@@ -15,6 +17,7 @@ class FractalCompressor(object):
 
     def __init__(self, range_size: int, domain_size: int,
                  brightness_coefficient: float):
+        now = datetime.now()
         self.range_size = range_size
         self.domain_size = domain_size
         self.brightness_coefficient = brightness_coefficient
@@ -23,6 +26,7 @@ class FractalCompressor(object):
         )
         self.range_indexes = []
         self.domain_indexes = []
+        print("Initializing: ", datetime.now() - now)
 
     def split_into_range_blocks(self, img_data: np.ndarray) -> np.ndarray:
         """
@@ -50,7 +54,7 @@ class FractalCompressor(object):
         rows, cols = img_data.shape[:2]
         blocks = []
         size = self.domain_size
-        shift = self.domain_size // self.range_size
+        shift = self.domain_size // 2
         for row in range(0, rows, shift):
             for col in range(0, cols, shift):
                 domain = img_data[row: row + size, col: col + size]
@@ -74,11 +78,21 @@ class FractalCompressor(object):
 
     def compress(self, image):
         img_data = self._get_image_data(image)
+
+        now = datetime.now()
         ranges = self.split_into_range_blocks(img_data)
+        print("Split in ranges: ", datetime.now() - now)
+
+        now = datetime.now()
         domains = self.split_into_domain_blocks(img_data)
+        print("Split in domains: ", datetime.now() - now)
+
+        now = datetime.now()
         scaled_domains = scaled_all_blocks(
             domains, self.domain_transform_matrix, self.brightness_coefficient
         )
+        print("Scaled domains: ", datetime.now() - now)
+
         transformation = get_fractal_transformations(
             ranges, scaled_domains, self.range_indexes, self.domain_indexes,
             callback=lambda i: print("Iteration %s" % i)

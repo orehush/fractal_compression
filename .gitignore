@@ -2,3 +2,7 @@
 *.py[co]
 img/*
 !img/einstein.bmp
+*.c
+*.so
+build
+dist

@@ -1,5 +1,7 @@
-import numpy as np
+from datetime import datetime
 from typing import List
+
+import numpy as np
 
 
 def get_transform_matrix_for_domain(domain_size: int,
@@ -49,7 +51,7 @@ def get_color_shift_for_blocks(range_block: np.ndarray,
              for each domain arrays pixels and range block array pixels
     """
     width, height = range_block.shape[:2]
-    return - (domains - range_block).sum(axis=2).sum(axis=1) / (width * height)
+    return (domains - range_block).sum(axis=2).sum(axis=1) / (width * height)
 
 
 def get_index_for_closest_domain_to_range(range_block: np.ndarray,
@@ -65,19 +67,19 @@ def get_index_for_closest_domain_to_range(range_block: np.ndarray,
            for each domain arrays pixels and range block array pixels
     :return: int - index of closest domain to range
     """
-    shape = range_block.shape
-    if len(shape) == 3:
+    dim = len(range_block.shape)
+    if dim == 3:
         return np.fabs(
             np.transpose(
-                np.transpose(domains, axes=[1, 2, 0, 3]) + color_shift,
+                np.transpose(domains, axes=[1, 2, 0, 3]) - color_shift,
                 axes=[2, 0, 1, 3]
             ) - range_block
         ).sum(axis=3).sum(axis=2).sum(axis=1).argmin()
-    if len(shape) == 2:
+    if dim == 2:
         return np.fabs(
-            np.transpose(domains.T + color_shift.T) - range_block
+            np.transpose(domains.T - color_shift.T) - range_block
         ).sum(axis=2).sum(axis=1).argmin()
-    raise ValueError("Arrays with dimensions %s not supported" % len(shape))
+    raise ValueError("Arrays with dimensions %s not supported" % dim)
 
 
 def scaled_all_blocks(domains: np.ndarray,
@@ -91,11 +93,13 @@ def scaled_all_blocks(domains: np.ndarray,
     :param brightness_coefficient: float - aka compression coefficient
     :return: np.ndarray -
     """
-    scaled_by_matrix = lambda domain: scale_matrix_by_size(
-        domain, scaled_transform_matrix
-    )
-    return np.apply_along_axis(scaled_by_matrix, axis=0, arr=domains) * \
-        brightness_coefficient
+
+    def scale_matrix(domain):
+        return scale_matrix_by_size(domain, scaled_transform_matrix)
+
+    return np.array(list(map(
+        scale_matrix, domains
+    ))) * brightness_coefficient
 
 
 def get_fractal_transformations(ranges: np.ndarray,
@@ -112,7 +116,8 @@ def get_fractal_transformations(ranges: np.ndarray,
     :param callback: function
     :return:
     """
-    fractal_transformations = np.zeros(ranges.shape, dtype=np.ndarray)
+    now = datetime.now()
+    fractal_transformations = np.zeros((ranges.shape[0], 6), dtype=np.uint16)
 
     for i, range_block in enumerate(ranges):
 
@@ -122,13 +127,14 @@ def get_fractal_transformations(ranges: np.ndarray,
         )
 
         chosen_color_shift = tuple(color_shift[closest_domain_index]) \
-            if isinstance(color_shift, np.ndarray) \
+            if isinstance(color_shift[0], np.ndarray) \
             else (color_shift[closest_domain_index], )
 
-        fractal_transformations[i] = np.array([
+        fractal_transformations[i] = np.array(
             ranges_indexes[i] +
             domains_indexes[closest_domain_index] +
             chosen_color_shift
-        ])
+        )
         if i % 100 == 0 and callable(callback):
             callback(i)
+            print(datetime.now() - now)

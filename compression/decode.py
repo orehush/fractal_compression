@@ -4,7 +4,7 @@ from scipy.ndimage import affine_transform
 
 from compression.affine_transform import AFFINE_TRANSFORMS_3D, \
     AFFINE_TRANSFORMS_2D
-from compression.algorithm import scale_matrix_by_size, \
+from compression.utils import scale_matrix_by_size, \
     get_transform_matrix_for_domain
 from compression.const import TRANSFORMATION, TRANSFORMATION3D
 
