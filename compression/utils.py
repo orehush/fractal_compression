@@ -93,7 +93,7 @@ def get_fractal_transformations(ranges: np.ndarray,
     :return:
     """
     now = datetime.now()
-    transformations_shape = ranges.shape[0], 14
+    transformations_shape = ranges.shape[0], 6
     fractal_transformations = np.zeros(transformations_shape, dtype=np.float32)
 
     for i, range_block in enumerate(ranges):
@@ -103,30 +103,18 @@ def get_fractal_transformations(ranges: np.ndarray,
         # and range block array pixels
         color_shift = np.mean(delta, axis=(2, 1))
 
-        closest_domain_index0 = get_index_for_closest_domain_to_range(
-            delta[:, :, :, 0], color_shift[:, 0]
+        closest_domain_index = get_index_for_closest_domain_to_range(
+            delta, color_shift
         )
-        closest_domain_index1 = get_index_for_closest_domain_to_range(
-            delta[:, :, :, 1], color_shift[:, 1]
-        )
-        closest_domain_index2 = get_index_for_closest_domain_to_range(
-            delta[:, :, :, 2], color_shift[:, 2]
-        )
-        chosen_color_shift0 = color_shift[closest_domain_index0, 0]
-        chosen_color_shift1 = color_shift[closest_domain_index1, 1]
-        chosen_color_shift2 = color_shift[closest_domain_index2, 2]
 
-        # chosen_color_shift = tuple(color_shift[closest_domain_index]) \
-        #     if isinstance(color_shift[0], np.ndarray) \
-        #     else (color_shift[closest_domain_index], )
+        chosen_color_shift = tuple(color_shift[closest_domain_index]) \
+            if isinstance(color_shift[0], np.ndarray) \
+            else (color_shift[closest_domain_index], )
 
         fractal_transformations[i] = np.array(
             ranges_indexes[i] +
-            domains_indexes[closest_domain_index0] +
-            domains_indexes[closest_domain_index1] +
-            domains_indexes[closest_domain_index2] +
-            (chosen_color_shift0, chosen_color_shift1, chosen_color_shift2),
-            dtype=np.float32
+            domains_indexes[closest_domain_index] +
+            chosen_color_shift, dtype=np.float32
         )
         if i % 100 == 0 and callable(callback):
             callback(i)

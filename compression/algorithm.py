@@ -104,8 +104,5 @@ class FractalCompressor(object):
 if __name__ == '__main__':
     compressor = FractalCompressor(RANGE_BLOCK_SIZE, DOMAIN_BLOCK_SIZE,
                                    BRIGHTNESS_COEFFICIENT)
-    # result = compressor.compress('../img/einstein.bmp')
-    # Image.fromarray(face()[200:712, 400:912]).show()
-    result = compressor.compress(face()[200:712, 400:912])
+    result = compressor.compress('../img/einstein.bmp')
     print(list(map(lambda x: list(x), result)))
-
