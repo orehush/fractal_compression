@@ -40,45 +40,23 @@ def scale_matrix_by_size(matrix: np.ndarray, transform_matrix: np.ndarray):
     raise ValueError("Scale not support shape %s " % shape)
 
 
-def get_color_shift_for_blocks(range_block: np.ndarray,
-                               domains: np.ndarray) -> np.ndarray:
-    """
-
-    :param range_block: np.ndarray - one range block
-    :param domains: np.ndarray - array of domains blocks
-                    with the same size as range_block
-    :return: np.ndarray - calculate average distance
-             for each domain arrays pixels and range block array pixels
-    """
-    width, height = range_block.shape[:2]
-    return (domains - range_block).sum(axis=2).sum(axis=1) / (width * height)
-
-
-def get_index_for_closest_domain_to_range(range_block: np.ndarray,
-                                          domains: np.ndarray,
+def get_index_for_closest_domain_to_range(delta: np.ndarray,
                                           color_shift: np.ndarray) \
         -> np.ndarray:
     """
 
-    :param range_block: np.ndarray - one range block
-    :param domains: np.ndarray - array of domains blocks
-                    with the same size as range_block
+    :param delta: np.ndarray - delta before domains blocks and range block
     :param color_shift: np.ndarray - average distance
            for each domain arrays pixels and range block array pixels
     :return: int - index of closest domain to range
     """
-    dim = len(range_block.shape)
+    dim = len(delta.shape)
+    if dim == 4:
+        return np.sum(np.fabs(
+            np.transpose(delta, axes=[1, 2, 0, 3]) - color_shift,
+        ), axis=(0, 1, 3)).argmin()
     if dim == 3:
-        return np.fabs(
-            np.transpose(
-                np.transpose(domains, axes=[1, 2, 0, 3]) - color_shift,
-                axes=[2, 0, 1, 3]
-            ) - range_block
-        ).sum(axis=3).sum(axis=2).sum(axis=1).argmin()
-    if dim == 2:
-        return np.fabs(
-            np.transpose(domains.T - color_shift.T) - range_block
-        ).sum(axis=2).sum(axis=1).argmin()
+        return np.sum(np.fabs(delta.T - color_shift.T), axis=(1, 0)).argmin()
     raise ValueError("Arrays with dimensions %s not supported" % dim)
 
 
@@ -97,9 +75,7 @@ def scaled_all_blocks(domains: np.ndarray,
     def scale_matrix(domain):
         return scale_matrix_by_size(domain, scaled_transform_matrix)
 
-    return np.array(list(map(
-        scale_matrix, domains
-    ))) * brightness_coefficient
+    return np.array(list(map(scale_matrix, domains))) * brightness_coefficient
 
 
 def get_fractal_transformations(ranges: np.ndarray,
@@ -117,24 +93,42 @@ def get_fractal_transformations(ranges: np.ndarray,
     :return:
     """
     now = datetime.now()
-    fractal_transformations = np.zeros((ranges.shape[0], 6), dtype=np.uint16)
+    transformations_shape = ranges.shape[0], 14
+    fractal_transformations = np.zeros(transformations_shape, dtype=np.float32)
 
     for i, range_block in enumerate(ranges):
+        delta = domains - range_block
 
-        color_shift = get_color_shift_for_blocks(range_block, domains)
-        closest_domain_index = get_index_for_closest_domain_to_range(
-            range_block, domains, color_shift
+        # calculate average distance for each domain arrays pixels
+        # and range block array pixels
+        color_shift = np.mean(delta, axis=(2, 1))
+
+        closest_domain_index0 = get_index_for_closest_domain_to_range(
+            delta[:, :, :, 0], color_shift[:, 0]
         )
+        closest_domain_index1 = get_index_for_closest_domain_to_range(
+            delta[:, :, :, 1], color_shift[:, 1]
+        )
+        closest_domain_index2 = get_index_for_closest_domain_to_range(
+            delta[:, :, :, 2], color_shift[:, 2]
+        )
+        chosen_color_shift0 = color_shift[closest_domain_index0, 0]
+        chosen_color_shift1 = color_shift[closest_domain_index1, 1]
+        chosen_color_shift2 = color_shift[closest_domain_index2, 2]
 
-        chosen_color_shift = tuple(color_shift[closest_domain_index]) \
-            if isinstance(color_shift[0], np.ndarray) \
-            else (color_shift[closest_domain_index], )
+        # chosen_color_shift = tuple(color_shift[closest_domain_index]) \
+        #     if isinstance(color_shift[0], np.ndarray) \
+        #     else (color_shift[closest_domain_index], )
 
         fractal_transformations[i] = np.array(
             ranges_indexes[i] +
-            domains_indexes[closest_domain_index] +
-            chosen_color_shift
+            domains_indexes[closest_domain_index0] +
+            domains_indexes[closest_domain_index1] +
+            domains_indexes[closest_domain_index2] +
+            (chosen_color_shift0, chosen_color_shift1, chosen_color_shift2),
+            dtype=np.float32
         )
         if i % 100 == 0 and callable(callback):
             callback(i)
             print(datetime.now() - now)
+    return fractal_transformations

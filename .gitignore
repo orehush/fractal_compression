@@ -6,3 +6,5 @@ img/*
 *.so
 build
 dist
+*.json
+*.zip

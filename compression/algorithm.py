@@ -3,6 +3,7 @@ from datetime import datetime
 import numpy as np
 
 from PIL import Image
+from scipy.misc import face
 
 from compression.affine_transform import affine_transform_generator
 from compression.utils import scaled_all_blocks, \
@@ -103,4 +104,8 @@ class FractalCompressor(object):
 if __name__ == '__main__':
     compressor = FractalCompressor(RANGE_BLOCK_SIZE, DOMAIN_BLOCK_SIZE,
                                    BRIGHTNESS_COEFFICIENT)
-    print(compressor.compress('../img/einstein.bmp'))
+    # result = compressor.compress('../img/einstein.bmp')
+    # Image.fromarray(face()[200:712, 400:912]).show()
+    result = compressor.compress(face()[200:712, 400:912])
+    print(list(map(lambda x: list(x), result)))
+
