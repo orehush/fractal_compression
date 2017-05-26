@@ -11,19 +11,17 @@ from compression.const import TRANSFORMATION
 RANGE_BLOCK_SIZE = 8
 DOMAIN_BLOCK_SIZE = 16
 
-img_data = np.zeros((512, 512, 3), dtype=np.int16)
+img_data = np.zeros((512, 512), dtype=np.int16)
 
 domain_transform_matrix = get_transform_matrix_for_domain(DOMAIN_BLOCK_SIZE, RANGE_BLOCK_SIZE)
 
 for _ in range(15):
-    new_img_data = np.zeros((512, 512, 3), dtype=np.int16)
+    new_img_data = np.zeros((512, 512), dtype=np.int16)
     for t in TRANSFORMATION:
         r_x, r_y = int(t[0]), int(t[1])
         d_x, d_y = int(t[2]), int(t[3])
-        transform = AFFINE_TRANSFORMS_3D[int(t[4])]
-        color_shift = t[5:]
-
-
+        transform = AFFINE_TRANSFORMS_2D[int(t[4])]
+        color_shift = t[5]
 
         domain = img_data[d_x:d_x+DOMAIN_BLOCK_SIZE, d_y:d_y+DOMAIN_BLOCK_SIZE]
         # if domain.shape[:2] != (DOMAIN_BLOCK_SIZE, DOMAIN_BLOCK_SIZE):
@@ -39,5 +37,5 @@ for _ in range(15):
     print(img_data.shape)
     print(img_data.dtype)
 
-    Image.fromarray(img_data, 'RGB').show()
+    Image.fromarray(img_data).show()
     input()
