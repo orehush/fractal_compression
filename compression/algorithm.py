@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from random import randint
 import numpy as np
 
 from PIL import Image
@@ -67,6 +67,36 @@ class FractalCompressor(object):
                     self.domain_indexes.append((row, col, number, ))
         return np.array(blocks)
 
+    def split_into_random_domain_blocks(self, img_data: np.ndarray,
+                                        amount=4000) -> np.ndarray:
+        """
+        Split image into random domains
+        :param img_data:
+        :param amount:
+        :return:
+        """
+        rows, cols = img_data.shape[:2]
+        size = self.domain_size
+        points_set = set()
+        while len(points_set) <= amount:
+            points_set.add(
+                (
+                    randint(0, rows - size),
+                    randint(0, cols - size),
+                )
+            )
+        blocks = []
+        for x, y in points_set:
+            domain = img_data[x: x+size, y:y+size]
+            if domain.shape[:2] != (size, size):
+                continue
+            for transformed_domain, number in affine_transform_generator(
+                    domain):
+                blocks.append(transformed_domain)
+                self.domain_indexes.append((x, y, number,))
+
+        return np.array(blocks)
+
     @staticmethod
     def _get_image_data(image):
         if isinstance(image, Image.Image):
@@ -77,7 +107,7 @@ class FractalCompressor(object):
             return image
         raise ValueError("Not support type: %s" % type(image))
 
-    def compress(self, image):
+    def compress(self, image, random_domains=True):
         img_data = self._get_image_data(image)
 
         now = datetime.now()
@@ -85,7 +115,8 @@ class FractalCompressor(object):
         print("Split in ranges: ", datetime.now() - now)
 
         now = datetime.now()
-        domains = self.split_into_domain_blocks(img_data)
+        domains = self.split_into_random_domain_blocks(img_data) \
+            if random_domains else self.split_into_domain_blocks(img_data)
         print("Split in domains: ", datetime.now() - now)
 
         now = datetime.now()
