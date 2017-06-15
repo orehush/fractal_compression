@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import List
 
 import numpy as np
+from sklearn.cluster import DBSCAN, KMeans
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 
 def get_transform_matrix_for_domain(domain_size: int,
@@ -78,11 +80,39 @@ def scaled_all_blocks(domains: np.ndarray,
     return np.array(list(map(scale_matrix, domains))) * brightness_coefficient
 
 
+def clustering_blocks(ranges, domains, scaler='minmax'):
+    """
+
+    :param ranges:
+    :param domains:
+    :param scaler: 'minmax' or 'standard'
+    :return:
+    """
+    all_blocks = np.concatenate((ranges, domains))
+    means = all_blocks.mean(axis=(1, 2), dtype=np.float32)
+    stds = all_blocks.std(axis=(1, 2), dtype=np.float32)
+    points = np.matrix([means, stds]).T
+
+    if scaler == 'minmax':
+        points = MinMaxScaler().fit_transform(points)
+    elif scaler == 'standard':
+        points = StandardScaler().fit_transform(points)
+    else:
+        raise ValueError("Not support scaler type %s " % scaler)
+
+    labels = KMeans(n_clusters=30).fit_predict(points)
+    labels_set = set(labels)
+    range_labels = labels[0:ranges.shape[0]]
+    domain_labels = labels[ranges.shape[0]:]
+    return labels_set, range_labels, domain_labels
+
+
 def get_fractal_transformations(ranges: np.ndarray,
                                 domains: np.ndarray,
                                 ranges_indexes: List[tuple],
                                 domains_indexes: List[tuple],
-                                callback=None) -> np.ndarray:
+                                divide_into_clusters=False,
+                                callback=None) -> list:
     """
 
     :param ranges: np.ndarray
@@ -92,10 +122,47 @@ def get_fractal_transformations(ranges: np.ndarray,
     :param callback: function
     :return:
     """
-    now = datetime.now()
-    transformations_shape = ranges.shape[0], 6
-    fractal_transformations = np.zeros(transformations_shape, dtype=np.float32)
 
+    if not divide_into_clusters:
+        return search_transformations(
+            ranges, domains, ranges_indexes, domains_indexes
+        )
+
+    fractal_transformations = []
+    ranges_indexes = np.array(ranges_indexes)
+    domains_indexes = np.array(domains_indexes)
+    labels_set, range_labels, domain_labels = clustering_blocks(ranges, domains)
+
+    for group in labels_set:
+        ranges_conditions = range_labels == group
+        domains_conditions = domain_labels == group
+
+        group_ranges = ranges[ranges_conditions]
+        group_domains = domains[domains_conditions]
+        group_ranges_indexes = ranges_indexes[ranges_conditions]
+        group_domains_indexes = domains_indexes[domains_conditions]
+        if group_ranges.shape[0] == 0:
+            continue
+
+        if group_domains.shape[0] * 2 < group_ranges.shape[0]:
+            group_domains = domains
+            group_domains_indexes = domains_indexes
+
+        fractal_transformations.extend(
+            search_transformations(
+                group_ranges,
+                group_domains,
+                group_ranges_indexes,
+                group_domains_indexes
+            )
+        )
+
+    return fractal_transformations
+
+
+def search_transformations(ranges, domains, ranges_indexes, domains_indexes):
+    now = datetime.now()
+    fractal_transformations = []
     for i, range_block in enumerate(ranges):
         delta = domains - range_block
 
@@ -107,16 +174,17 @@ def get_fractal_transformations(ranges: np.ndarray,
             delta, color_shift
         )
 
-        chosen_color_shift = tuple(color_shift[closest_domain_index]) \
-            if isinstance(color_shift[0], np.ndarray) \
-            else (color_shift[closest_domain_index], )
+        if isinstance(color_shift[0], np.ndarray):
+            chosen_color_shift = tuple(color_shift[closest_domain_index].astype(int))
+        else:
+            chosen_color_shift = (np.int(color_shift[closest_domain_index]), )
 
-        fractal_transformations[i] = np.array(
-            ranges_indexes[i] +
-            domains_indexes[closest_domain_index] +
-            chosen_color_shift, dtype=np.float32
-        )
-        if i % 100 == 0 and callable(callback):
-            callback(i)
+        fractal_transformations.append((
+            tuple(ranges_indexes[i]) +
+            tuple(domains_indexes[closest_domain_index]) +
+            chosen_color_shift
+        ))
+        if i % 100 == 0:
             print(datetime.now() - now)
+            now = datetime.now()
     return fractal_transformations

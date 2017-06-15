@@ -107,7 +107,14 @@ class FractalCompressor(object):
             return image
         raise ValueError("Not support type: %s" % type(image))
 
-    def compress(self, image, random_domains=True):
+    def compress(self, image, use_random_domains=False, quick_algorithm=True):
+        """
+
+        :param image: Image object, np.ndarray or path to image
+        :param use_random_domains: bool - choose random domains
+        :param quick_algorithm: bool - use quick algorithm with clustering blocks
+        :return:
+        """
         img_data = self._get_image_data(image)
 
         now = datetime.now()
@@ -115,8 +122,10 @@ class FractalCompressor(object):
         print("Split in ranges: ", datetime.now() - now)
 
         now = datetime.now()
-        domains = self.split_into_random_domain_blocks(img_data) \
-            if random_domains else self.split_into_domain_blocks(img_data)
+        if use_random_domains:
+            domains = self.split_into_random_domain_blocks(img_data)
+        else:
+            domains = self.split_into_domain_blocks(img_data)
         print("Split in domains: ", datetime.now() - now)
 
         now = datetime.now()
@@ -127,7 +136,7 @@ class FractalCompressor(object):
 
         transformation = get_fractal_transformations(
             ranges, scaled_domains, self.range_indexes, self.domain_indexes,
-            callback=lambda i: print("Iteration %s" % i)
+            divide_into_clusters=quick_algorithm
         )
         return transformation
 
@@ -135,5 +144,5 @@ class FractalCompressor(object):
 if __name__ == '__main__':
     compressor = FractalCompressor(RANGE_BLOCK_SIZE, DOMAIN_BLOCK_SIZE,
                                    BRIGHTNESS_COEFFICIENT)
-    result = compressor.compress('../img/einstein.bmp')
-    print(list(map(lambda x: list(x), result)))
+    result = compressor.compress('../img/samples/mountain2-8.bmp')
+    print(result)
