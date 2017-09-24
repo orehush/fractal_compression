@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 
 import numpy as np
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 
@@ -80,7 +80,7 @@ def scaled_all_blocks(domains: np.ndarray,
     return np.array(list(map(scale_matrix, domains))) * brightness_coefficient
 
 
-def clustering_blocks(ranges, domains, scaler='minmax'):
+def clustering_blocks(ranges, domains, scaler='standard'):
     """
 
     :param ranges:
@@ -107,26 +107,23 @@ def clustering_blocks(ranges, domains, scaler='minmax'):
     return labels_set, range_labels, domain_labels
 
 
-def get_fractal_transformations(ranges: np.ndarray,
-                                domains: np.ndarray,
-                                ranges_indexes: List[tuple],
-                                domains_indexes: List[tuple],
-                                divide_into_clusters=False,
-                                callback=None) -> list:
+def get_deltas(domains, ranges):
+    for r in ranges:
+        yield domains - r
+
+
+def search_transformations_within_clusters(ranges: np.ndarray,
+                                           domains: np.ndarray,
+                                           ranges_indexes: List[tuple],
+                                           domains_indexes: List[tuple]) -> list:
     """
 
     :param ranges: np.ndarray
     :param domains: np.ndarray
     :param ranges_indexes: list of tuples
     :param domains_indexes: list of tuples
-    :param callback: function
     :return:
     """
-
-    if not divide_into_clusters:
-        return search_transformations(
-            ranges, domains, ranges_indexes, domains_indexes
-        )
 
     fractal_transformations = []
     ranges_indexes = np.array(ranges_indexes)
@@ -150,8 +147,7 @@ def get_fractal_transformations(ranges: np.ndarray,
 
         fractal_transformations.extend(
             search_transformations(
-                group_ranges,
-                group_domains,
+                get_deltas(group_domains, group_ranges),
                 group_ranges_indexes,
                 group_domains_indexes
             )
@@ -160,11 +156,10 @@ def get_fractal_transformations(ranges: np.ndarray,
     return fractal_transformations
 
 
-def search_transformations(ranges, domains, ranges_indexes, domains_indexes):
-    now = datetime.now()
+def search_transformations(deltas, ranges_indexes, domains_indexes):
+    # now = datetime.now()
     fractal_transformations = []
-    for i, range_block in enumerate(ranges):
-        delta = domains - range_block
+    for i, delta in enumerate(deltas):
 
         # calculate average distance for each domain arrays pixels
         # and range block array pixels
@@ -175,16 +170,16 @@ def search_transformations(ranges, domains, ranges_indexes, domains_indexes):
         )
 
         if isinstance(color_shift[0], np.ndarray):
-            chosen_color_shift = tuple(color_shift[closest_domain_index].astype(int))
+            chosen_color_shift = tuple(color_shift[closest_domain_index].astype(float))
         else:
-            chosen_color_shift = (np.int(color_shift[closest_domain_index]), )
+            chosen_color_shift = (np.float(color_shift[closest_domain_index]), )
 
         fractal_transformations.append((
             tuple(ranges_indexes[i]) +
             tuple(domains_indexes[closest_domain_index]) +
             chosen_color_shift
         ))
-        if i % 100 == 0:
-            print(datetime.now() - now)
-            now = datetime.now()
+        # if i % 100 == 0:
+        #     print(datetime.now() - now)
+        #     now = datetime.now()
     return fractal_transformations

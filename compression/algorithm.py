@@ -3,31 +3,42 @@ from random import randint
 import numpy as np
 
 from PIL import Image
-from scipy.misc import face
 
 from compression.affine_transform import affine_transform_generator
-from compression.utils import scaled_all_blocks, \
-    get_transform_matrix_for_domain, get_fractal_transformations
-
-RANGE_BLOCK_SIZE = 8
-DOMAIN_BLOCK_SIZE = 16
-BRIGHTNESS_COEFFICIENT = 0.7
+from compression.utils import (
+    scaled_all_blocks,
+    get_transform_matrix_for_domain,
+    search_transformations_within_clusters,
+    search_transformations,
+    get_deltas)
+from compression.const import (
+    RANGE_BLOCK_SIZE,
+    DOMAIN_BLOCK_SIZE,
+    BRIGHTNESS_COEFFICIENT
+)
 
 
 class FractalCompressor(object):
 
     def __init__(self, range_size: int, domain_size: int,
                  brightness_coefficient: float):
-        now = datetime.now()
         self.range_size = range_size
         self.domain_size = domain_size
+
         self.brightness_coefficient = brightness_coefficient
+
         self.domain_transform_matrix = get_transform_matrix_for_domain(
             self.domain_size, self.range_size
         )
+
         self.range_indexes = []
         self.domain_indexes = []
-        print("Initializing: ", datetime.now() - now)
+
+        # those variables will be updated after load image
+        self.img_data = None
+        self.ranges = None
+        self.domains = None
+        self.scaled_domains = None
 
     def split_into_range_blocks(self, img_data: np.ndarray) -> np.ndarray:
         """
@@ -105,44 +116,195 @@ class FractalCompressor(object):
             return np.array(Image.open(image))
         if isinstance(image, np.ndarray):
             return image
-        raise ValueError("Not support type: %s" % type(image))
+        raise TypeError("Not support type: %s" % type(image))
 
-    def compress(self, image, use_random_domains=False, quick_algorithm=True):
-        """
-
-        :param image: Image object, np.ndarray or path to image
-        :param use_random_domains: bool - choose random domains
-        :param quick_algorithm: bool - use quick algorithm with clustering blocks
-        :return:
-        """
-        img_data = self._get_image_data(image)
+    def load(self, image, use_random_domains=False):
+        now = datetime.now()
+        self.img_data = self._get_image_data(image)
+        print('Loaded image', datetime.now() - now)
 
         now = datetime.now()
-        ranges = self.split_into_range_blocks(img_data)
-        print("Split in ranges: ", datetime.now() - now)
+        self.ranges = self.split_into_range_blocks(self.img_data)
+        print('Divided into range blocks', datetime.now() - now)
 
         now = datetime.now()
         if use_random_domains:
-            domains = self.split_into_random_domain_blocks(img_data)
+            self.domains = self.split_into_random_domain_blocks(self.img_data)
         else:
-            domains = self.split_into_domain_blocks(img_data)
-        print("Split in domains: ", datetime.now() - now)
+            self.domains = self.split_into_domain_blocks(self.img_data)
+        print('Divided into domains blocks', datetime.now() - now)
 
         now = datetime.now()
-        scaled_domains = scaled_all_blocks(
-            domains, self.domain_transform_matrix, self.brightness_coefficient
+        self.scaled_domains = scaled_all_blocks(
+            self.domains,
+            self.domain_transform_matrix,
+            self.brightness_coefficient
         )
-        print("Scaled domains: ", datetime.now() - now)
+        print('Scaled domain blocks', datetime.now() - now)
 
-        transformation = get_fractal_transformations(
-            ranges, scaled_domains, self.range_indexes, self.domain_indexes,
-            divide_into_clusters=quick_algorithm
+        print('Range blocks:', len(self.ranges))
+        print('Domain blocks:', len(self.domains))
+
+    @staticmethod
+    def get_min_difference(domain_deltas):
+        return np.min(np.abs(np.mean(domain_deltas, axis=(1, 2))))
+
+    def coefficient_similarity(self, func='max'):
+        min_differences = list(map(
+            self.get_min_difference,
+            get_deltas(self.scaled_domains, self.ranges)
+        ))
+
+        if func == 'max':
+            return np.max(min_differences)
+        elif func == 'avg':
+            return np.average(min_differences)
+
+        raise ValueError(
+            "Not supported function %s for coeficient similarity" % func
         )
+
+    def compress(self, quick_algorithm=True):
+        """
+        :param quick_algorithm: bool - use quick algorithm with clustering blocks
+        :return:
+        """
+
+        if quick_algorithm:
+            transformation = search_transformations_within_clusters(
+                self.ranges, self.scaled_domains,
+                self.range_indexes, self.domain_indexes,
+            )
+        else:
+            transformation = search_transformations(
+                get_deltas(self.scaled_domains, self.ranges),
+                self.range_indexes, self.domain_indexes
+            )
         return transformation
 
 
 if __name__ == '__main__':
     compressor = FractalCompressor(RANGE_BLOCK_SIZE, DOMAIN_BLOCK_SIZE,
                                    BRIGHTNESS_COEFFICIENT)
-    result = compressor.compress('../img/samples/mountain2-8.bmp')
-    print(result)
+    print('mountain2-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/mountain2-8.bmp')
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('mountain1-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/mountain1-8.bmp')
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('hill-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/hill-8.bmp')
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('sea1-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/sea1-8.bmp')
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('sea2-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/sea2-8.bmp')
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('sea-beach-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/sea-beach-8.bmp')
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('-------------------------- RANDOM BLOCKS --------------------------'
+          '\n\n\n\n\n\n\n\n\n\n')
+
+    print('mountain2-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/mountain2-8.bmp', True)
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('mountain1-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/mountain1-8.bmp', True)
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('hill-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/hill-8.bmp', True)
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('sea1-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/sea1-8.bmp', True)
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('sea2-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/sea2-8.bmp', True)
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
+
+    print('sea-beach-8.bmp')
+    now = datetime.now()
+    compressor.load('../img/samples/sea-beach-8.bmp', True)
+    print('Quick algorithm')
+    print(compressor.compress(quick_algorithm=True))
+    print(datetime.now() - now)
+    print('Standard algorithm')
+    print(compressor.compress(quick_algorithm=False))
+    print(datetime.now() - now)
